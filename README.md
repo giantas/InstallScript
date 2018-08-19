@@ -1,7 +1,8 @@
 # [Odoo](https://www.odoo.com "Odoo's Homepage") Install Script
 
 This script is based on the install script from Yenthe V.G (https://github.com/Yenthe666/InstallScript)
-but goes a bit further and has been improved. This script will also give you the ability to define an xmlrpc_port in the .conf file that is generated under /etc/
+but goes a bit further and has been improved. 
+
 This script can be safely used in a multi-odoo code base server because the default Odoo port is changed BEFORE the Odoo is started.
 
 ## Installation procedure
@@ -11,7 +12,7 @@ This script can be safely used in a multi-odoo code base server because the defa
 sudo wget https://raw.githubusercontent.com/giantas/InstallScript/11.0/odoo_install.sh
 ```
 ### 2. Modify the parameters as you wish.
-In the (config)[config.sh], modify parameters as you wish.
+In the [config](config.sh), modify parameters as you wish.
 
 **NOTE**: User *true* or *false* where appropriate
 
