@@ -1,9 +1,11 @@
 #!/bin/bash
 ################################################################################
 # Script for installing Odoo 11 on OpenSUSE 42.3 (could be used for other versions too but WITH SOME EDITS)
-# Author: Yenthe Van Ginneken
 # Author: Aswa Paul
+# Author: Yenthe Van Ginneken
 #-------------------------------------------------------------------------------
+# IMPORTANT! This script contains extra libraries that are specifically needed for Odoo 11.0
+#
 # This script will install Odoo on your OpenSUSE OS. It can install multiple Odoo instances
 # in one OS because of the different xmlrpc_ports
 #-------------------------------------------------------------------------------
@@ -22,101 +24,155 @@ NOCOLOR='\033[0m'
 CYAN='\033[1;36m'
 this_script=`basename "$0"`
 
-# Check if version was provided
-if [[ "$1" == "" ]];then
+# Check if branch was provided
+BRANCH="$1"
+
+if [[ "$BRANCH" == "" ]];then
     echo -e "${DARKRED}Error...${NOCOLOR}";
-    echo -e "\n${RED}required: version ${NOCOLOR}(e.g 11.0, 10.0, etc)";
+    echo -e "\n${RED}required: version ${NOCOLOR}(e.g 11.0, 10.0, master, etc)";
     echo -e "\ntry running: \n\t${CYAN}bash $this_script 11.0${NOCOLOR}\n"
     exit 1;
+
 else
-    # Check if version matches syntax
-    if [[ "$1" =~ "^[0-9]{1,2}.[0-9]{1}$" ]]; then
-        OE_VERSION="$1";
+    # Check if branch exists
+    branch_exists=`git ls-remote --heads https://github.com/odoo/odoo.git ${BRANCH} | wc -l`
+    
+    if [ "$branch_exists" -eq 0 ]; then
+        echo -e "${RED}Branch '${BRANCH}' not found!${NOCOLOR}"
+        exit 1
+        
     else
-        echo -e "${DARKRED}Error...${NOCOLOR}";
-        echo -e "\n${RED}version should match existent github branch versions${NOCOLOR} (e.g 10.0, 11.0, etc)";
-        echo -e "\ntry running: \n\t${CYAN}bash $this_script 11.0${NOCOLOR}\n"
-        exit 1;
+        OE_VERSION=$BRANCH
+        . config.sh
+        
     fi
+    
 fi
 
-##fixed parameters
-#odoo
-OE_USER="odoo"
 OE_HOME="/$OE_USER"
 OE_HOME_EXT="/$OE_USER/${OE_USER}-server"
-#The default port where this Odoo instance will run under (provided you use the command -c in the terminal)
-#Set to true if you want to install it, false if you don't need it or have it already installed.
-INSTALL_WKHTMLTOPDF="False"
-#Set the default Odoo port (you still have to use -c /etc/odoo-server.conf for example to use this.)
-OE_PORT="8069"
-#Choose the Odoo version which you want to install. For example: 11.0, 10.0, 9.0 or saas-18. When using 'master' the master version will be installed.
-#IMPORTANT! This script contains extra libraries that are specifically needed for Odoo 11.0
-OE_VERSION="$1"
-# Set this to True if you want to install Odoo 11 Enterprise!
-IS_ENTERPRISE="True"
-#set the superadmin password
-OE_SUPERADMIN="admin"
-OE_CONFIG="${OE_USER}-server"
+OE_PREFIX="${OE_USER}-server"
+OE_CONFIG="/etc/${OE_PREFIX}.conf"
 OE_SERVICE="${OE_USER}.service"
 
-##
+function table {
+    printf "%-40s | ${CYAN}%-40s${NOCOLOR}\n" "$1" "$2"
+}
+
+##Show fixed parameters
+echo -e "${CYAN}Sourced parameters: ${NOCOLOR}\n"
+table "User" "${OE_USER}"
+table "Port" "${OE_PORT}"
+table "SuperAdmin Password" "${OE_SUPERADMIN}"
+table "Database" "${DATABASE_NAME}"
+table "Install wkhtmltopdf" "${INSTALL_WKHTMLTOPDF}"
+table "Install Python2 dependencies" "${INSTALL_PIP2_DEPS}"
+table "Install Python3 dependencies" "${INSTALL_PIP3_DEPS}"
+table "Branch" "${BRANCH}"
+table "Install Enterprise Version" "${IS_ENTERPRISE}"
+table "Demo data" "${WITH_DEMO_DATA}"
+
+echo -e "\n${CYAN}Implied parameters: ${NOCOLOR}\n"
+
+table "Home Path" "${OE_HOME}"
+table "Server Path" "${OE_HOME_EXT}"
+table "Configuration file" "${OE_CONFIG}"
+
+read -p "Proceed with this configuration? (y/n): " confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+
+##  TODO: Fix this
 ###  WKHTMLTOPDF download links
 ## === Ubuntu Trusty x64 & x32 === (for other distributions please replace these two links,
 ## in order to have correct version of wkhtmltox installed, for a danger note refer to 
 ## https://www.odoo.com/documentation/8.0/setup/install.html#deb ):
 WKHTMLTOX_X64=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_linux-centos7-amd64.rpm
 WKHTMLTOX_X32=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_linux-centos6-i386.rpm
+
 #--------------------------------------------------
 # Update Server
 #--------------------------------------------------
-echo -e "\n---- Update Server ----"
-sudo zypper update
-sudo zypper up 
+echo -e "\n---- Update repositories ----"
+sudo zypper ref
 
+if [ "$UPDATE_SERVER" = true]; then
+    echo -e "\n---- Update Server ----"
+    sudo zypper up 
+fi
+    
 #--------------------------------------------------
 # Install PostgreSQL Server
 #--------------------------------------------------
 echo -e "\n---- Install PostgreSQL Server ----"
-sudo zypper install -y postgresql 
+sudo zypper install -y postgresql96 postgresql96-devel
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
-sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
+sudo su - postgres -c "createuser -s $OE_USER; dropdb $DATABASE_NAME; createdb $DATABASE_NAME owner $OE_USER; " 2> /dev/null || true
 
 #--------------------------------------------------
 # Install Dependencies
 #--------------------------------------------------
-echo -e "\n--- Installing Python 3 + pip3 --"
-sudo zypper install python3 python3-pip python-devel python3-devel bzr python-suds libxml2-devel libxslt-devel mc make gcc 
+if [ "$INSTALL_PIP2_DEPS" = true ]; then
+    echo -e "\n--- Installing Python 3 + pip3 --"
+    sudo zypper install python python-pip python-devel bzr python-suds libxml2-devel libxslt-devel mc make gcc 
 
-sudo zypper install -y libxslt
+    sudo zypper install -y libxslt
 
-echo -e "\n---- Install tool packages ----"
-sudo zypper install -y wget git bzr python-pip
+    echo -e "\n---- Install tool packages ----"
+    sudo zypper install -y wget git
 
-echo -e "\n---- Install PyChart ----"
-sudo zypper addrepo https://download.opensuse.org/repositories/spins:invis:common/openSUSE_Leap_42.3/spins:invis:common.repo
-sudo zypper refresh
-sudo zypper install -y python-PyChart
+    echo -e "\n---- Install PyChart ----"
+    sudo zypper addrepo https://download.opensuse.org/repositories/spins:invis:common/openSUSE_Leap_42.3/spins:invis:common.repo
+    sudo zypper refresh
+    sudo zypper install -y python-PyChart
 
-echo -e "\n---- Install python packages ----"
-sudo pip3 install PyPDF2 PyWebDAV suds-jurko
-sudo pip3 install python-dateutil docutils feedparser jinja2 ldap lxml mako mock
-sudo pip3 install python-openid psycopg2 psutil babel pydot pyparsing reportlab simplejson pytz 
-sudo pip3 install unittest2 vatnumber vobject pywebdav werkzeug xlwt pyyaml pypdf passlib decorator
-sudo pip3 install markupsafe pyusb pyserial paramiko utils pdftools requests xlsxwriter
-sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc
-sudo pip3 install pypdf2 Babel Werkzeug html2text Pillow>=3.4.2 ninja2 gdata XlsxWriter ebaysdk suds-jurko greenlet xlrd 
+    echo -e "\n---- Install python packages ----"
+    sudo pip3 install PyPDF2 PyWebDAV suds-jurko
+    sudo pip3 install python-dateutil docutils feedparser jinja2 ldap lxml mako mock
+    sudo pip3 install python-openid psycopg2 psutil babel pydot pyparsing reportlab simplejson pytz 
+    sudo pip3 install unittest2 vatnumber vobject pywebdav werkzeug xlwt pyyaml pypdf passlib decorator
+    sudo pip3 install markupsafe pyusb pyserial paramiko utils pdftools requests xlsxwriter
+    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc num2words
+    sudo pip3 install pypdf2 Babel Werkzeug html2text Pillow>=3.4.2 ninja2 gdata XlsxWriter ebaysdk suds-jurko greenlet xlrd 
 
-echo -e "\n--- Install other required packages" 
-sudo zypper install -y python-gevent 
+    echo -e "\n--- Install other required packages" 
+    sudo zypper install -y python3-gevent
+    
+fi
+
+if [ "$INSTALL_PIP3_DEPS" = true ]; then
+    echo -e "\n--- Installing Python 3 + pip3 --"
+    sudo zypper install python3 python3-pip python3-devel bzr python-suds libxml2-devel libxslt-devel mc make gcc 
+
+    sudo zypper install -y libxslt
+
+    echo -e "\n---- Install tool packages ----"
+    sudo zypper install -y wget git
+
+    echo -e "\n---- Install PyChart ----"
+    sudo zypper addrepo https://download.opensuse.org/repositories/spins:invis:common/openSUSE_Leap_42.3/spins:invis:common.repo
+    sudo zypper refresh
+    sudo zypper install -y python-PyChart
+
+    echo -e "\n---- Install python packages ----"
+    sudo pip3 install PyPDF2 PyWebDAV suds-jurko
+    sudo pip3 install python-dateutil docutils feedparser jinja2 ldap lxml mako mock
+    sudo pip3 install python-openid psycopg2 psutil babel pydot pyparsing reportlab simplejson pytz 
+    sudo pip3 install unittest2 vatnumber vobject pywebdav werkzeug xlwt pyyaml pypdf passlib decorator
+    sudo pip3 install markupsafe pyusb pyserial paramiko utils pdftools requests xlsxwriter
+    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc num2words
+    sudo pip3 install pypdf2 Babel Werkzeug html2text Pillow>=3.4.2 ninja2 gdata XlsxWriter ebaysdk suds-jurko greenlet xlrd 
+
+    echo -e "\n--- Install other required packages" 
+    sudo zypper install -y python3-gevent
+    
+fi 
 
 sudo ln -s /usr/local/bin/lessc /usr/bin/lessc
 
 #--------------------------------------------------
 # Install Wkhtmltopdf if needed
 #--------------------------------------------------
-if [ $INSTALL_WKHTMLTOPDF = "True" ]; then
+if [ "$INSTALL_WKHTMLTOPDF" = true ]; then
   echo -e "\n---- Install wkhtml and place shortcuts on correct place for ODOO 11 ----"
   #pick up correct one from x64 & x32 versions:
   if [ "`getconf LONG_BIT`" == "64" ];then
@@ -129,7 +185,7 @@ if [ $INSTALL_WKHTMLTOPDF = "True" ]; then
   sudo ln -s /usr/local/bin/wkhtmltopdf /usr/bin
   sudo ln -s /usr/local/bin/wkhtmltoimage /usr/bin
 else
-  echo "Wkhtmltopdf isn't installed due to the choice of the user!"
+  echo -e "${DARKRED}Wkhtmltopdf isn't installed due to the choice of the user!${NOCOLOR}"
 fi
 
 echo -e "\n---- Create ODOO system user ----"
@@ -146,9 +202,9 @@ sudo chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server ===="
-sudo git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
+sudo git clone --depth 1 --branch --single-branch $OE_VERSION https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
 
-if [ $IS_ENTERPRISE == "True" ]; then
+if [ "$IS_ENTERPRISE" = true ]; then
     # Odoo Enterprise install!
     echo -e "\n--- Create symlink for node"
     sudo ln -s /usr/bin/nodejs /usr/bin/node
@@ -168,7 +224,6 @@ if [ $IS_ENTERPRISE == "True" ]; then
 
     echo -e "\n---- Added Enterprise code under $OE_HOME/enterprise/addons ----"
     echo -e "\n---- Installing Enterprise specific libraries ----"
-    sudo pip3 install num2words ofxparse
     sudo zypper install nodejs npm
     sudo npm install -g less
     sudo npm install -g less-plugin-clean-css
@@ -183,23 +238,26 @@ sudo chown -R $OE_USER:$OE_USER $OE_HOME/*
 
 echo -e "* Create server config file"
 
-sudo touch /etc/${OE_CONFIG}.conf
+sudo touch $OE_CONFIG
 echo -e "* Creating server config file"
-sudo su root -c "printf '[options] \n; This is the password that allows database operations:\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'admin_passwd = ${OE_SUPERADMIN}\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'db_host = False\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'db_port = False\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'db_user = ${OE_USER}\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'db_password = False\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'xmlrpc_port = ${OE_PORT}\n' >> /etc/${OE_CONFIG}.conf"
-sudo su root -c "printf 'logfile = /var/log/${OE_USER}/${OE_CONFIG}.log\n' >> /etc/${OE_CONFIG}.conf"
-if [ $IS_ENTERPRISE == "True" ]; then
-    sudo su root -c "printf 'addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons\n' >> /etc/${OE_CONFIG}.conf"
+sudo su root -c "printf '[options] \n; This is the password that allows database operations:\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'admin_passwd = ${OE_SUPERADMIN}\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'db_host = False\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'db_port = False\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'db_user = ${OE_USER}\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'db_password = False\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'xmlrpc_port = ${OE_PORT}\n' >> ${OE_CONFIG}"
+sudo su root -c "printf 'logfile = /var/log/${OE_USER}/${OE_PREFIX}.log\n' >> ${OE_CONFIG}"
+if [ "$IS_ENTERPRISE" = true ]; then
+    ADDONS_PATH="addons_path=${OE_HOME}/enterprise/addons,${OE_HOME_EXT}/addons"
+    
 else
-    sudo su root -c "printf 'addons_path=${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons\n' >> /etc/${OE_CONFIG}.conf"
+    ADDONS_PATH="addons_path=${OE_HOME_EXT}/addons,${OE_HOME}/custom/addons"
+    
 fi
-sudo chown $OE_USER:$OE_USER /etc/${OE_CONFIG}.conf
-sudo chmod 640 /etc/${OE_CONFIG}.conf
+sudo su root -c "printf '${ADDONS_PATH}\n' >> ${OE_CONFIG}"
+sudo chown $OE_USER:$OE_USER $OE_CONFIG
+sudo chmod 640 $OE_CONFIG
 
 #--------------------------------------------------
 # Adding ODOO as a deamon (systemd)
@@ -207,9 +265,30 @@ sudo chmod 640 /etc/${OE_CONFIG}.conf
 
 echo -e "* Create init file"
 
+EXEC_FILE=$(find $OE_HOME_EXT -maxdepth 1 -executable -type f | head -n 1)
+
+if [ "$EXEC_FILE" = "" ]; then
+    echo -e "${RED}Could NOT find path to executable!${NOCOLOR}"
+    read -p "Enter path to Odoo executable file: " EXEC_FILE
+    
+    if [ "$EXEC_FILE" = "" ]; then
+        WARNING="${RED}Edit ${OE_SERVICE} to fill in executable file path before starting service!${NOCOLOR}"
+    fi
+    
+fi
+
+
+if [ "$WITH_DEMO_DATA" = true ];then
+    EXEC_START="$EXEC_FILE --config=$OE_CONFIG"
+    
+else
+    EXEC_START="$EXEC_FILE --config=$OE_CONFIG --without-demo=all"
+    
+fi
+
 cat <<EOF > ~/$OE_SERVICE
 [Unit]
-Description=Odoo Server Service
+Description=$OE_PREFIX Service
 Requires=postgresql.service
 After=network.target
 
@@ -217,7 +296,7 @@ After=network.target
 Type=simple
 User=$OE_USER
 WorkingDirectory=$OE_HOME
-ExecStart=$OE_HOME_EXT/$OE_CONFIG --config=/etc/$OE_CONFIG.conf
+ExecStart=$EXEC_START
 
 [Install]
 WantedBy=multi-user.target
@@ -236,8 +315,11 @@ echo "Port: $OE_PORT"
 echo "User service: $OE_USER"
 echo "User PostgreSQL: $OE_USER"
 echo "Code location: $OE_USER"
-echo "Addons folder: $OE_USER/$OE_CONFIG/addons/"
+echo "Addons folder: $ADDONS_PATH"
 echo "Start Odoo service: sudo systemctl start $OE_SERVICE"
 echo "Stop Odoo service: sudo systemctl stop $OE_SERVICE"
 echo "Restart Odoo service: sudo systemctl restart $OE_SERVICE"
+
+[ -z "$WARNING" ] && echo "Warning: None" || echo "Warning: ${WARNING}"
+
 echo "-----------------------------------------------------------"
