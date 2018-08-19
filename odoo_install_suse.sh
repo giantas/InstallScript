@@ -1,8 +1,8 @@
 #!/bin/bash
 ################################################################################
 # Script for installing Odoo 11 on OpenSUSE 42.3 (could be used for other versions too but WITH SOME EDITS)
-# Author: Yenthe Van Ginneken
 # Author: Aswa Paul
+# Author: Yenthe Van Ginneken
 #-------------------------------------------------------------------------------
 # IMPORTANT! This script contains extra libraries that are specifically needed for Odoo 11.0
 #
@@ -131,7 +131,7 @@ if [ "$INSTALL_PIP2_DEPS" = true ]; then
     sudo pip3 install python-openid psycopg2 psutil babel pydot pyparsing reportlab simplejson pytz 
     sudo pip3 install unittest2 vatnumber vobject pywebdav werkzeug xlwt pyyaml pypdf passlib decorator
     sudo pip3 install markupsafe pyusb pyserial paramiko utils pdftools requests xlsxwriter
-    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc
+    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc num2words
     sudo pip3 install pypdf2 Babel Werkzeug html2text Pillow>=3.4.2 ninja2 gdata XlsxWriter ebaysdk suds-jurko greenlet xlrd 
 
     echo -e "\n--- Install other required packages" 
@@ -159,7 +159,7 @@ if [ "$INSTALL_PIP3_DEPS" = true ]; then
     sudo pip3 install python-openid psycopg2 psutil babel pydot pyparsing reportlab simplejson pytz 
     sudo pip3 install unittest2 vatnumber vobject pywebdav werkzeug xlwt pyyaml pypdf passlib decorator
     sudo pip3 install markupsafe pyusb pyserial paramiko utils pdftools requests xlsxwriter
-    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc
+    sudo pip3 install psycogreen ofxparse gevent argparse pyOpenSSL>=16.2.0 lessc num2words
     sudo pip3 install pypdf2 Babel Werkzeug html2text Pillow>=3.4.2 ninja2 gdata XlsxWriter ebaysdk suds-jurko greenlet xlrd 
 
     echo -e "\n--- Install other required packages" 
@@ -202,7 +202,7 @@ sudo chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server ===="
-sudo git clone --depth 1 --branch $OE_VERSION https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
+sudo git clone --depth 1 --branch --single-branch $OE_VERSION https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
 
 if [ "$IS_ENTERPRISE" = true ]; then
     # Odoo Enterprise install!
@@ -224,7 +224,6 @@ if [ "$IS_ENTERPRISE" = true ]; then
 
     echo -e "\n---- Added Enterprise code under $OE_HOME/enterprise/addons ----"
     echo -e "\n---- Installing Enterprise specific libraries ----"
-    sudo pip3 install num2words ofxparse
     sudo zypper install nodejs npm
     sudo npm install -g less
     sudo npm install -g less-plugin-clean-css
