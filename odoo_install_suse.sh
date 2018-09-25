@@ -94,7 +94,7 @@ WKHTMLTOX_X32=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_lin
 echo -e "\n---- Update repositories ----"
 sudo zypper ref
 
-if [ "$UPDATE_SERVER" = true]; then
+if [ "$UPDATE_SERVER" = true ]; then
     echo -e "\n---- Update Server ----"
     sudo zypper up 
 fi

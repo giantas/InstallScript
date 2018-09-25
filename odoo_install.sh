@@ -89,29 +89,12 @@ WKHTMLTOX_X64=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_lin
 WKHTMLTOX_X32=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_linux-trusty-i386.deb
 
 #--------------------------------------------------
-# Make sure only root or sudoers can run our script
-#--------------------------------------------------
-if [ "$(id -u)" != "0" ]; then
-    echo "This script must be run with administrator rights! \nRun this script with sudo ./your-file-name in place of ./your-file-name." 1>&2
-    exit 1
-fi
-=======
-##
-###  WKHTMLTOPDF download links
-## === Ubuntu Trusty x64 & x32 === (for other distributions please replace these two links,
-## in order to have correct version of wkhtmltox installed, for a danger note refer to 
-## https://www.odoo.com/documentation/8.0/setup/install.html#deb ):
-WKHTMLTOX_X64=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_linux-trusty-amd64.deb
-WKHTMLTOX_X32=https://downloads.wkhtmltopdf.org/0.12/0.12.1/wkhtmltox-0.12.1_linux-trusty-i386.deb
->>>>>>> suse_script
-
-#--------------------------------------------------
 # Update Server
 #--------------------------------------------------
 echo -e "\n---- Update repositories ----"
 sudo apt-get update
 
-if [ "$UPDATE_SERVER" = true]; then
+if [ "$UPDATE_SERVER" = true ]; then
     echo -e "\n---- Update Server ----"
     sudo apt-get upgrade -y
 fi
@@ -120,9 +103,7 @@ fi
 # Install PostgreSQL Server
 #--------------------------------------------------
 echo -e "\n---- Install PostgreSQL Server ----"
-<<<<<<< HEAD
-apt-get install postgresql -y
-=======
+
 sudo apt-get install postgresql -y
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
@@ -180,7 +161,7 @@ chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server ===="
-sudo git clone --depth 1 --branch --single-branch $OE_VERSION https://www.github.com/odoo/odoo $OE_HOME_EXT/
+sudo git clone --depth 1 --branch $OE_VERSION --single-branch https://www.github.com/odoo/odoo $OE_HOME_EXT/
 
 if [ $IS_ENTERPRISE = "True" ]; then
     # Odoo Enterprise install!
