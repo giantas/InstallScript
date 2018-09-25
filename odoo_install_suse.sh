@@ -202,7 +202,7 @@ sudo chown $OE_USER:$OE_USER /var/log/$OE_USER
 # Install ODOO
 #--------------------------------------------------
 echo -e "\n==== Installing ODOO Server ===="
-sudo git clone --depth 1 --branch --single-branch $OE_VERSION https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
+sudo git clone --depth 1 --branch $OE_VERSION --single-branch https://www.github.com/odoo/odoo "$OE_HOME_EXT/"
 
 if [ "$IS_ENTERPRISE" = true ]; then
     # Odoo Enterprise install!
